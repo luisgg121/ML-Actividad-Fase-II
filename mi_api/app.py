@@ -2,99 +2,61 @@
  "cells": [
   {
    "cell_type": "code",
-   "execution_count": 2,
-   "id": "260d14da-a7fb-48a5-bb70-94fa08dcb0ee",
+   "execution_count": null,
+   "id": "fab482fe-7a24-400e-9df1-91007288a753",
    "metadata": {},
-   "outputs": [
-    {
-     "name": "stdout",
-     "output_type": "stream",
-     "text": [
-      "Precisión: 0.9895\n",
-      "Matriz de confusión:\n",
-      " [[ 919   14]\n",
-      " [   7 1060]]\n",
-      "Reporte de clasificación:\n",
-      "               precision    recall  f1-score   support\n",
-      "\n",
-      "           0       0.99      0.98      0.99       933\n",
-      "           1       0.99      0.99      0.99      1067\n",
-      "\n",
-      "    accuracy                           0.99      2000\n",
-      "   macro avg       0.99      0.99      0.99      2000\n",
-      "weighted avg       0.99      0.99      0.99      2000\n",
-      "\n"
-     ]
-    }
-   ],
+   "outputs": [],
    "source": [
-    "# ML Actividad de la Fase 2\n",
-    "# b) modelo de aprendizaje automático supervisado a partir del conjunto de datos elaborado, que sea capaz de determinar el tipo de protocolo\n",
-    "#    que debe seguir el vehículo al manipular un producto cualquiera en el trayecto del almacén a la zona de manufactura.\n",
-    "#\n",
-    "import pandas as pd\n",
-    "from sklearn.model_selection import train_test_split\n",
-    "from sklearn.preprocessing import LabelEncoder\n",
-    "from sklearn.ensemble import RandomForestClassifier\n",
-    "from sklearn.metrics import classification_report, confusion_matrix, accuracy_score\n",
-    "\n",
-    "# 1. Cargar los datos\n",
-    "df = pd.read_excel(\"Datos.xlsx\")\n",
-    "\n",
-    "# 2. Preprocesamiento\n",
-    "# Eliminar filas vacías o incompletas\n",
-    "df.dropna(inplace=True)\n",
-    "\n",
-    "# Codificar variables categóricas\n",
-    "label_cols = ['Procedencia', 'Manipulacion', 'Temperatura', 'Protocolo']\n",
-    "encoders = {col: LabelEncoder() for col in label_cols}\n",
-    "for col in label_cols:\n",
-    "    df[col] = encoders[col].fit_transform(df[col])\n",
-    "\n",
-    "# 3. Separar variables\n",
-    "X = df[['Embalaje', 'Ancho', 'Largo', 'Alto', 'Peso (kg)', 'Procedencia', 'Manipulacion', 'Temperatura']]\n",
-    "y = df['Protocolo']\n",
-    "\n",
-    "# 4. División de datos\n",
-    "X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)\n",
-    "\n",
-    "# 5. Entrenamiento del modelo\n",
-    "model = RandomForestClassifier(n_estimators=100, random_state=42)\n",
-    "model.fit(X_train, y_train)\n",
-    "\n",
-    "# 6. Evaluación\n",
-    "y_pred = model.predict(X_test)\n",
-    "print(\"Precisión:\", accuracy_score(y_test, y_pred))\n",
-    "print(\"Matriz de confusión:\\n\", confusion_matrix(y_test, y_pred))\n",
-    "print(\"Reporte de clasificación:\\n\", classification_report(y_test, y_pred))\n"
-   ]
-  },
-  {
-   "cell_type": "code",
-   "execution_count": 3,
-   "id": "149545f0-2777-4762-a7af-6cb2c5180e91",
-   "metadata": {},
-   "outputs": [
-    {
-     "data": {
-      "text/plain": [
-       "['modelo_protocolo.pkl']"
-      ]
-     },
-     "execution_count": 3,
-     "metadata": {},
-     "output_type": "execute_result"
-    }
-   ],
-   "source": [
+    "from fastapi import FastAPI\n",
+    "from pydantic import BaseModel\n",
     "import joblib\n",
-    "joblib.dump(model, 'modelo_protocolo.pkl')"
+    "import numpy as np\n",
+    "\n",
+    "# Inicializar la aplicación\n",
+    "app = FastAPI(title=\"API de Protocolo\")\n",
+    "\n",
+    "# Cargar el modelo entrenado\n",
+    "modelo = joblib.load(\"modelo_protocolo.pkl\")\n",
+    "\n",
+    "# Definir el esquema de entrada (ajusta los campos a tu dataset real)\n",
+    "class Muestra(BaseModel):\n",
+    "    Embalaje: int\n",
+    "    Ancho: float\n",
+    "    Largo: float\n",
+    "    Alto: float\n",
+    "    Peso: float\n",
+    "    Procedencia: str\n",
+    "    Manipulacion: str\n",
+    "    Temperatura: str\n",
+    "\n",
+    "@app.get(\"/\")\n",
+    "def home():\n",
+    "    return {\"mensaje\": \"API de predicción de protocolos activa\"}\n",
+    "\n",
+    "@app.post(\"/predict\")\n",
+    "def predict(muestra: Muestra):\n",
+    "    # Convertir a vector de entrada\n",
+    "    features = [\n",
+    "        muestra.Embalaje,\n",
+    "        muestra.Ancho,\n",
+    "        muestra.Largo,\n",
+    "        muestra.Alto,\n",
+    "        muestra.Peso,\n",
+    "        muestra.Procedencia,\n",
+    "        muestra.Manipulacion,\n",
+    "        muestra.Temperatura\n",
+    "    ]\n",
+    "    data = np.array([features], dtype=object)\n",
+    "\n",
+    "    # Predicción\n",
+    "    pred = modelo.predict(data)[0]\n",
+    "    return {\"protocolo_asignado\": str(pred)}\n"
    ]
   },
   {
    "cell_type": "code",
    "execution_count": 1,
-   "id": "e5a6cff3-5471-410b-ab38-809aa1ac6f28",
+   "id": "7d6b26c3-ebf7-4c7e-94a7-ae1dabaea3a4",
    "metadata": {},
    "outputs": [
     {
@@ -164,6 +126,14 @@
     "for i, v in enumerate(viajes):\n",
     "    print(f\"\\nViaje {i+1}: Productos {v['productos']}, Ruta: {v['ruta']} → (0,0)\")"
    ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "081e7329-2e8c-469c-8fae-751fa95b0409",
+   "metadata": {},
+   "outputs": [],
+   "source": []
   }
  ],
  "metadata": {
